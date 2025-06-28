@@ -178,3 +178,115 @@ WHERE o.Status = 'Delivered'
 GROUP BY p.Product_Category
 ORDER BY avg_order_quantity DESC;
 
+-- -------------------------------------------------------
+-- Section 3: Product Returns and Rating Analysis
+-- Questions Q11 to Q15
+-- Focus: Return rates by category and product, top return reasons,
+--        fulfillment success, and the relationship between ratings and returns
+-- Note: Most queries focus on 'Returned' and 'Delivered' statuses.
+--       Output is formatted using CAST/ROUND for clean readability.
+-- -------------------------------------------------------
+
+--Q11. Return Rate by Product Category
+--Identify product categories with high return rates to investigate product quality or expectation gaps.
+
+select p.product_category,
+cast(Round(count(case when od.status='returned' then 1 end)*100.0/count(*), 2) as decimal(5,2)) 
+as return_rate
+from orders od
+join product p
+on od.productid=p.productid
+group by p.product_category
+order by return_rate;
+
+-- Q11: Return Rate by Product Category
+-- Objective: Identify product categories with high return rates
+-- Note: Return rate = (Returned Orders / Total Orders) * 100
+--Using CTEs for readability
+
+with return_cte as(
+select p.product_category, count(od.status) as return_orders
+from orders od join product p
+on od.productid=p.productid
+where od.status='returned'
+group by p.Product_Category),
+
+count_cte as(select p.product_category,count(od.status) as ordercount from orders od
+join product p on p.productid=od.productid
+group by p.Product_Category
+)
+select count_cte.product_category,
+CAST( (return_orders)*100.0/ordercount as Decimal (5,2)) as Return_rate 
+from return_cte join count_cte
+on return_cte.Product_Category=count_cte.product_Category
+order by return_rate desc;
+
+--Comment
+-- Used CTEs to split return and total orders for better readability
+-- Applied CAST to format return rate percentage to two decimal places
+-- Compared return orders against total orders for each category
+
+--Q12. Top 5 Products with Highest Return Rate
+--Spot individual products being returned frequently to review listing or QA.
+
+select top 5 p.product_name, 
+CAST(COUNT(CASE WHEN od.Status = 'Returned' THEN 1 END) * 100.0 / COUNT(*) AS DECIMAL(5,2)) 
+AS return_rate
+from orders od join product p
+on p.productid=od.productid
+group by p.product_name
+order by return_rate desc;
+
+--Q13. Top 5 Return Reasons
+--Understand the most common reasons customers return products.
+select top 5 Reason, count(*) as return_count
+from orders
+where status='Returned'
+group by Reason
+order by return_count desc;
+
+--Using Coalesce to Handle Null values(avoid reason as Null)
+
+select top 5 Coalesce (Reason,'Not mentioned') as Return_reason, count(*) as return_count
+from orders
+where status='Returned'
+group by Coalesce (Reason,'Not mentioned')
+order by return_count desc;
+
+--Q14. Compare Returned vs Delivered Count per Category
+--Compare fulfillment success rate by category.
+
+select p.product_category, 
+count(case when od.status='delivered' then 1 end) as delivery_category_count,
+count(case when od.status='returned' then 1 end) as return_category_count
+from orders od join product p
+on od.productid=p.productid
+group by p.product_category;
+
+--Q15. Rating vs Return Rate Relationship
+--Check if lower ratings are linked to more returns for product improvement.
+
+select rating,
+case 
+when rating < 3 then 'below avg'
+when rating =3 then 'avg'
+else 'above_avg'
+end as rating_cat,
+CAST(count(case when status='returned' then 1 end)*100.0/count(*) as decimal(5,2))as return_rate
+from orders
+group by rating,
+case 
+when rating < 3 then 'below avg'
+when rating =3 then 'avg'
+else 'above_avg'
+end
+order by rating desc;
+
+--other method without categorizing
+
+select rating,
+CAST(count(case when status='returned' then 1 end)*100.0/count(*) as decimal(5,2)) return_rate
+from orders
+group by rating
+order by return_rate desc;
+
