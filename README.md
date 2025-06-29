@@ -2,6 +2,8 @@
 
 **Flipkart Orders & Product Portfolio Project- Real-World Business Scenarios**
 
+**Disclaimer: This project is for learning purposes. The dataset is simulated and sourced from a public Kaggle dataset. It is not affiliated with Flipkart.**
+
 **1. Project Overview:**
 
 This repository showcases 20 real-world business SQL problems solved using MS SQL Server, focusing on product, delivery, and customer behavior analytics. 
