@@ -290,3 +290,134 @@ from orders
 group by rating
 order by return_rate desc;
 
+-- ---------------------------------------------------------------------
+-- Section 4: Delivery and Operational Analysis (Q16 to Q20)
+-- ---------------------------------------------------------------------
+
+
+-- Q16: Avg Delivery Time by Delivery Type
+-- Objective: Identify average delivery timelines to assess SLA adherence
+
+SELECT 
+    delivery_type,
+    AVG(DATEDIFF(DAY, orderdate, delivery_date)) AS avg_deliverytime_in_days
+FROM orders
+GROUP BY delivery_type
+ORDER BY avg_deliverytime_in_days DESC;
+
+
+-- Further Analysis: Return Rate for Each Delivery Type
+
+SELECT
+    delivery_type,
+    CAST(
+        COUNT(CASE WHEN status = 'returned' THEN 1 END) * 100.0 / COUNT(*) 
+        AS DECIMAL(5, 2)
+    ) AS return_rate
+FROM orders
+GROUP BY delivery_type
+ORDER BY return_rate DESC;
+
+
+-- 📌 Insight Summary (Q16 Extension):
+
+-- Among the three delivery types, Shipped from Abroad had the longest 
+-- average delivery time of approximately 15 days and also the highest 
+-- return rate at 30.92%, making it a major operational red flag.
+-- Despite being the fastest, Express delivery (avg ~3 days) showed a 
+-- return rate of 26.38%, possibly indicating product quality issues or 
+-- customer dissatisfaction.
+-- Standard Delivery averaged ~9 days and had the lowest return rate 
+-- (23.73%), making it the most balanced fulfillment method with 
+-- optimization potential.
+
+
+-- Q17: Delayed Deliveries Count (If Delivery > 5 Days)
+-- Objective: Count and analyze delayed orders to reduce future delays
+
+-- Method 1: Subquery
+SELECT COUNT(*) AS delay_delivery 
+FROM (
+    SELECT DATEDIFF(DAY, orderdate, delivery_date) AS daysdiffcnt
+    FROM orders
+    WHERE DATEDIFF(DAY, orderdate, delivery_date) > 5
+) delay_count;
+
+
+-- Method 2: Simplified (Same Output)
+SELECT COUNT(*) AS delay_delivery
+FROM orders
+WHERE DATEDIFF(DAY, orderdate, delivery_date) > 5;
+
+
+-- Breakdown by Delivery Type (Optional Deep-Dive)
+SELECT 
+    delivery_type,
+    COUNT(*) AS delayed_orders
+FROM orders
+WHERE DATEDIFF(DAY, orderdate, delivery_date) > 5
+GROUP BY delivery_type
+ORDER BY delayed_orders DESC;
+
+
+-- Q18: Fastest and Slowest Zones (Average Delivery Days)
+-- Objective: Identify zone-wise delivery efficiency or bottlenecks
+
+SELECT 
+    zone,
+    AVG(DATEDIFF(DAY, orderdate, delivery_date)) AS avg_delivery_days
+FROM orders
+GROUP BY zone;
+
+
+-- Q19: Product Categories with Highest Express Orders
+-- Objective: Analyze which product types rely heavily on fast shipping
+
+SELECT TOP 1 
+    p.product_category,
+    COUNT(CASE WHEN od.delivery_type = 'Express' THEN 1 END) AS express_count
+FROM orders od
+JOIN product p ON od.productid = p.productid
+GROUP BY p.product_category
+ORDER BY express_count DESC;
+
+
+-- Q20: Delivery Type Preference by Zone
+-- Objective: Determine the most preferred delivery method per zone
+
+-- Method 1: Without Window Function (Simple Aggregation)
+SELECT 
+    delivery_type,
+    zone,
+    COUNT(*) AS delivery_count
+FROM orders
+WHERE status = 'delivered'
+GROUP BY delivery_type, zone
+ORDER BY delivery_count DESC;
+
+-- Use Case: Visualize full breakdown of delivery preferences by zone
+
+
+-- Method 2: With Window Function (Dense Rank)
+WITH Ranked_zone AS (
+    SELECT 
+        delivery_type,
+        zone,
+        COUNT(*) AS delivery_count,
+        DENSE_RANK() OVER (
+            PARTITION BY zone 
+            ORDER BY COUNT(*) DESC
+        ) AS delivery_zone_rank
+    FROM orders
+    WHERE status = 'delivered'
+    GROUP BY delivery_type, zone
+)
+SELECT * 
+FROM Ranked_zone 
+WHERE delivery_zone_rank = 1
+ORDER BY delivery_count DESC;
+
+-- Explanation:
+-- DESC ensures the most-used delivery type gets rank 1 within each zone.
+-- This helps identify delivery-type popularity at a zonal level for 
+-- operational alignment.
